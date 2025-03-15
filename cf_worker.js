@@ -10,6 +10,9 @@ async function handleRequest(request) {
 
   if (request.method === 'POST') {
     try {
+      const clientIP = request.headers.get('CF-Connecting-IP') || '127.0.0.1'
+      const userAgent = request.headers.get('User-Agent') || ''
+      
       // Parse the incoming data
       const data = await request.json()
       
@@ -24,7 +27,11 @@ async function handleRequest(request) {
             event_name: data.event_name,
             event_time: Math.floor(Date.now() / 1000),
             event_source_url: data.source_url,
-            user_data: data.user_data || {},
+            user_data: {
+              client_ip_address: clientIP,
+              client_user_agent: userAgent,
+              ...(data.user_data || {})
+            },
             custom_data: data.custom_data || {}
           }
         ],
