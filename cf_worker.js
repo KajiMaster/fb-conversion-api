@@ -1,4 +1,4 @@
-addEventListener('fetch', event => {
+aaddEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request))
 })
 
@@ -20,6 +20,19 @@ async function handleRequest(request) {
       const accessToken = FB_ACCESS_TOKEN
       const pixelId = FB_PIXEL_ID
       
+      // Prepare user data object, including fbc if present
+      const userData = {
+        client_ip_address: clientIP,
+        client_user_agent: userAgent,
+        ...(data.user_data || {})
+      }
+      
+      // Ensure fbc is handled correctly
+      if (data.user_data && data.user_data.fbc) {
+        // If fbc is already provided from client, use it as is
+        userData.fbc = data.user_data.fbc
+      }
+      
       // Format data for Facebook Conversions API
       const payload = {
         data: [
@@ -27,16 +40,16 @@ async function handleRequest(request) {
             event_name: data.event_name,
             event_time: Math.floor(Date.now() / 1000),
             event_source_url: data.source_url,
-            user_data: {
-              client_ip_address: clientIP,
-              client_user_agent: userAgent,
-              ...(data.user_data || {})
-            },
+            action_source: 'website', // Add this field as it's recommended by Facebook
+            user_data: userData,
             custom_data: data.custom_data || {}
           }
         ],
         access_token: accessToken
       }
+      
+      // Log the payload for debugging (remove in production)
+      console.log('Sending payload to Facebook:', JSON.stringify(payload))
       
       // Send to Facebook
       const fbResponse = await fetch(
@@ -51,12 +64,26 @@ async function handleRequest(request) {
       )
       
       const fbResult = await fbResponse.json()
-      return corsResponse(JSON.stringify(fbResult))
+      
+      // Log response from Facebook (remove in production)
+      console.log('Response from Facebook:', JSON.stringify(fbResult))
+      
+      return corsResponse(JSON.stringify({
+        success: true,
+        result: fbResult
+      }))
     } catch (error) {
-      return corsResponse('Error: ' + error.message, 500)
+      console.error('Error:', error)
+      return corsResponse(JSON.stringify({
+        success: false,
+        error: error.message
+      }), 500)
     }
   } else {
-    return corsResponse('Please use POST method', 405)
+    return corsResponse(JSON.stringify({
+      success: false,
+      error: 'Please use POST method'
+    }), 405)
   }
 }
 
